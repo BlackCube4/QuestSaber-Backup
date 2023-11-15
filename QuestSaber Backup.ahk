@@ -94,7 +94,7 @@ return
 ForceQuestExplorer:
 	ADBcheck()
 	ADBdeviceConnected()
-	RunWait, adb\adb.exe shell svc usb setFunctions mtp true
+	RunWait, adb\adb.exe shell svc usb setFunctions mtp true, , Hide
 return
 
 ExecuteEverything:
