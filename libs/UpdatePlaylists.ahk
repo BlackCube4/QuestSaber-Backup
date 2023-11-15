@@ -8,7 +8,7 @@
 
 foldersInDir(dir){
 	filePath := "Songlist.txt"
-	RunWait, % "cmd /c " . "dir /ad /b """ . %dir% . """ > " . filePath, , Hide
+	RunWait, % "cmd /c " . "dir /ad /b """ . dir . """ > " . filePath, , Hide
 	FileRead, fileContents, %filePath%
 	FileDelete, %filePath%
 	return fileContents
@@ -24,7 +24,7 @@ updatePlaylists(listOfSongs, playlistDir){
 			url := "https://api.beatsaver.com/maps/id/" . Hash1
 			UrlDownloadToFile, %url%, map.json
 			FileRead, Content, map.json
-			RegExMatch(Content, "m)""hash"": ""(.*?)""", Hash)
+			RegExMatch(Content, "m)""hash"": ""([A-Za-z0-9]{30,})""", Hash)
 		}
 		hashes[Hash1] := true
 	}

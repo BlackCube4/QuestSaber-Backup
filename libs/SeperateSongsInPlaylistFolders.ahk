@@ -1,5 +1,5 @@
 ﻿seperateSongsInPlaylistFolders(dir){
-	SongList := []
+	SongList := {}
 
 	Loop, Files, %dir%\ModData\com.beatgames.beatsaber\Mods\PlaylistManager\Playlists\*.*
 	{
@@ -8,131 +8,52 @@
 			continue
 		
 		FileRead, Content, %A_LoopFileFullPath%
-		
 		RegExMatch(Content, """playlistTitle"":""(.*?)""", PlaylistTitle)
-
-		pos := 1
+		pos := InStr(Content, "[")
 		loop
 		{
-			matchPos := RegExMatch(Content, """hash"":""(.*?)"".*?""songName"":""(.*?)""", match, pos)
-			
+			matchPos := RegExMatch(Content, """hash"":""(.*?)""", match, pos)
 			;stop when not finding any more songs
 			if matchPos = 0 
 				break
-		
-			url := "https://api.beatsaver.com/maps/hash/" . match1
+			;url := "https://api.beatsaver.com/maps/hash/" . match1
+			;UrlDownloadToFile, %url%, map.json
+			;FileReadLine, keyLine, map.json, 2
+			;RegExMatch(keyLine, """id"": ""(.*)""", key)
+
+			if (SongList[match1] = "")
+				SongList[match1] := PlaylistTitle1
+			else
+				SongList[match1] := SongList[match1] . "," . PlaylistTitle1
+			pos := matchPos + StrLen(match1)
+			;msgbox, % matchPos . "`n" . PlaylistTitle1 . "`n" . SongList[match1]
+		}
+	}
+
+	Loop, Files, %dir%\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\*.*, D
+	{
+		RegExMatch(A_LoopFileName, "(^\S*) ?", Hash)
+		if (StrLen(Hash1) < 15) {
+			url := "https://api.beatsaver.com/maps/id/" . Hash1
 			UrlDownloadToFile, %url%, map.json
-			FileReadLine, keyLine, map.json, 2
-			RegExMatch(keyLine, """id"": ""(.*)""", bskey)
+			FileRead, Content, map.json
+			RegExMatch(Content, "m)""hash"": ""([A-Za-z0-9]{30,})""", Hash)
+		}
+		Playlists := StrSplit(SongList[Hash1], ",")
 
-			SongList.Push({ "Playlist": PlaylistTitle1, "Key": bskey1,"Hash": match1, "SongName": match2})
+		FileMoveDir, %A_LoopFileFullPath%, %A_LoopFileDir%\%Hash1%, R
 
-			; Update the position to continue searching for the next match
-			pos := matchPos + 62 + StrLen(match2)
+		;if (StrLen(A_LoopFileName) > 43 or StrLen(A_LoopFileName) < 35)
+		;	msgbox, % "Filename: " A_LoopFileName "`n`n" "Hash: " Hash1 "`n`n" "Playlists: " SongList[Hash1] "`n`n" "FilenameCount: " Playlists.Length()
+		if (Playlists.Length() = 0) {
+			FileCopyDir, %A_LoopFileDir%\%Hash1%, %dir%\ModData\com.beatgames.beatsaber\Mods\SongLoader\Unsorted\%Hash1%
+		} else {
+			for index, entry in Playlists
+			{
+				FileCopyDir, %A_LoopFileDir%\%Hash1%, %dir%\ModData\com.beatgames.beatsaber\Mods\SongLoader\%entry%\%Hash1%
+			}
 		}
 	}
 
 	FileDelete, map.json
-
-	; Create an object to store elements and their occurrences
-	hashes := {}
-	duplicates := {}
-
-	; Loop through the array of objects
-	for index, song in SongList
-	{
-		if hashes.HasKey(song.Hash)
-		{
-			; Duplicate Hash found
-			duplicates[song.Hash] := true
-			; msgbox, % "Multible Playlists contain the following `nSong: " . song.SongName . "`nHash: " . song.Hash . "`none of the Playlists: " . song.Playlist
-			continue
-		}
-		else
-		{
-			; Store the Hash
-			hashes[song.Hash] := true
-		}
-	}
-
-	/*
-	for index, song in SongList
-	{
-		if duplicates.HasKey(song.Hash)
-		{
-			FileAppend, SongName: %song.SongName%   Hash: %song.Hash%   Key: %song.Key%   Playlist: %song.Playlist%`n, duplicates.txt
-		}
-	}
-	*/
-
-	/*
-	FileDelete, MySongs.ini
-	for index, song in SongList
-	{
-		Value := song.Key . "; " . song.Hash
-		Section := song.Playlist
-		Key := song.SongName
-		IniWrite, %Value%, MySongs.ini, %Section%, %Key%
-	}
-	*/
-
-	deleteList := []
-	for index, song in SongList
-	{
-		Playlist := song.Playlist
-		foundMatch := 0
-		basicPath := dir . "\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\"
-		
-		Needle := "^" . song.Hash
-		Loop, Files, %basicPath%*.*, D
-		{
-			if RegExMatch(A_LoopFileName, Needle)
-			{
-				matchName := A_LoopFileName
-				foundMatch ++
-				if foundMatch=2
-					msgbox, % "More than one Song found :/ `nNeedle" . Needle . "`nFolder: " . A_LoopFileFullPath
-			}
-		}
-		if (foundMatch > 0) {
-			if (duplicates.HasKey(song.Hash)) {
-				FileCopyDir, %basicPath%%matchName%, % basicPath . Playlist . "\" . song.Hash . " (" . song.Key . ")"
-				deleteList.Push(basicPath . matchName)
-			}
-			else
-			{
-				FileMoveDir, %basicPath%%matchName%, % basicPath . Playlist . "\" . song.Hash . " (" . song.Key . ")"
-			}
-		}
-		else {
-			Needle := "^" . song.Key
-			Loop, Files, %basicPath%*.*, D
-			{
-				if RegExMatch(A_LoopFileName, Needle)
-				{
-					matchName := A_LoopFileName
-					foundMatch ++
-					if foundMatch=2
-						msgbox, % "More than one Song found :/ `nNeedle" . Needle . "`nFolder: " . A_LoopFileFullPath
-				}
-			}
-			if (foundMatch > 0) {
-				if (duplicates.HasKey(song.Hash)) {
-					FileCopyDir, %basicPath%%matchName%, % basicPath . Playlist . "\" . song.Hash . " (" . song.Key . ")"
-					deleteList.Push(basicPath . matchName)
-				}
-				else
-					FileMoveDir, %basicPath%%matchName%, % basicPath . Playlist . "\" . song.Hash . " (" . song.Key . ")"
-			}
-			else
-			{
-				;MsgBox, % "Song is missing `nPlaylist: " . Playlist . "`nSong Name: " . song.SongName
-			}
-		}
-	}
-
-	for index, folderPath in deleteList
-	{
-		FileRemoveDir, %folderPath%, 1 ; Use the "1" flag to delete non-empty folders
-	}
 }

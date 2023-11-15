@@ -1,36 +1,34 @@
-﻿createPlaylistString(dir){
-
-	unsortedDir := dir . "\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\Unsorted"
-	if !(FileExist(unsortedDir))
+﻿createPlaylistString(SongFolder, PlaylistFolder){
+	if !(FileExist(SongFolder))
 	{
-		;MsgBox % "The Unsorted directory doesn't exists.`n`n" . unsortedDir
+		MsgBox % "The SongFolder doesn't exists.`n`n" . SongFolder
 		return 1
 	}
 
-	RegExMatch(unsortedDir, ".*\\(.*)", PlaylistName)
+	RegExMatch(SongFolder, ".*\\(.*)", PlaylistName)
 	playlistString := "{""playlistDescription"":null,""playlistAuthor"":null,""playlistTitle"":""" . PlaylistName1 . """,""songs"":["
 
-	Loop, Files, %unsortedDir%\*, D
+	Loop, Files, %SongFolder%\*, D
 	{
 		RegExMatch(A_LoopFileName, "(^\S*) ?", Hash)
 		if (StrLen(Hash1) < 15) {
 			url := "https://api.beatsaver.com/maps/id/" . Hash1
 			UrlDownloadToFile, %url%, map.json
 			FileRead, Content, map.json
-			RegExMatch(Content, "m)""hash"": ""(.*?)""", Hash)
+			RegExMatch(Content, "m)""hash"": ""([A-Za-z0-9]{30,})""", Hash)
 		}
 		playlistString := playlistString . "{""hash"":""" . Hash1 . """},"
 	}
 	playlistString := SubStr(playlistString, 1, -1)
 	playlistString := playlistString . "]}"
-	PlaylistPath := dir . "\ModData\com.beatgames.beatsaber\Mods\PlaylistManager\Playlists\" . StrReplace(PlaylistName1, " ", "_") . ".bplist_BMBF.json"
+	PlaylistPath := PlaylistFolder . "\" . StrReplace(PlaylistName1, " ", "_") . ".bplist_BMBF.json"
 	;if FileExist(PlaylistPath)
 	;{
 	;	MsgBox, Es gibt schon eine Playlist Datei für %PlaylistName1%
 	;	ExitApp
 	;}
 	FileDelete, %PlaylistPath%
-	msgbox, % PlaylistPath . "`n`n" . playlistString
+	;msgbox, % PlaylistPath . "`n`n" . playlistString
 	FileAppend, %playlistString%, %PlaylistPath%
 
 	FileDelete, map.json
