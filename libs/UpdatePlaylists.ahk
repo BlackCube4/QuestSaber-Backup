@@ -1,9 +1,25 @@
-﻿updatePlaylists(dir){
+﻿generateSongListQuest(){
+	filePath := "Songlist.txt"
+	RunWait, % "cmd /c " . "adb\adb.exe shell ls ""/sdcard/ModData/com.beatgames.beatsaber/Mods/SongLoader/CustomLevels"" > " . filePath, , Hide
+	FileRead, fileContents, %filePath%
+	FileDelete, %filePath%
+	return fileContents
+}
+
+foldersInDir(dir){
+	filePath := "Songlist.txt"
+	RunWait, % "cmd /c " . "dir /ad /b """ . %dir% . """ > " . filePath, , Hide
+	FileRead, fileContents, %filePath%
+	FileDelete, %filePath%
+	return fileContents
+}
+
+updatePlaylists(listOfSongs, playlistDir){
 	hashes := {}
 	
-	Loop, Files, %dir%\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\*, D
+	Loop, Parse, listOfSongs, `n
 	{
-		RegExMatch(A_LoopFileName, "(^\S*) ?", Hash)
+		RegExMatch(A_LoopField, "(^\S*) ?", Hash)
 		if (StrLen(Hash1) < 15) {
 			url := "https://api.beatsaver.com/maps/id/" . Hash1
 			UrlDownloadToFile, %url%, map.json
@@ -15,7 +31,7 @@
 
 	FileDelete, map.json
 
-	Loop, Files, %dir%\ModData\com.beatgames.beatsaber\Mods\PlaylistManager\Playlists\*.*
+	Loop, Files, %playlistDir%\*.*
 	{
 		;skip non json files
 		if (A_LoopFileExt != "json")

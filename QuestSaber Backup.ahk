@@ -10,43 +10,112 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 #Include libs\RecombineSongs.ahk
 #Include libs\SearchNewestDir.ahk
 
-Gui, Add, Checkbox, vChooseLocation, choose Backup location
-Gui, Add, Checkbox, vBackupModData Checked, Backup ModData
-Gui, Add, Checkbox, vBackupBMBFData, Backup BMBFData
-Gui, Add, Checkbox, vBackupAndroid, Backup Android
-Gui, Add, Checkbox, vUpdatePlaylists Checked, update Playlists
+; Create a initial state object
+stateObject := {"ChooseLocation": 0, "BackupModData": 1, "BackupPlaylists": 1, "BackupSongs": 1, "BackupBMBFData": 0, "BackupAndroid": 0, "UpdatePlaylists": 1, "SeperateSongs": 1, "CreateUnsorted": 1, "RecombineSongs": 1, "MovePlaylistsToQuest": 1, "MoveSongsToQuest": 1}
+
+; Write INI file data to stateObject
+for name, value in stateObject
+{
+    IniRead, buffer, State.ini, States, %name%, %value%
+	stateObject[name] := buffer
+}
+
+;Create Gui
+Gui, Add, Checkbox, vChooseLocation gChooseLocation, choose Backup location
+
+Gui, Add, Checkbox, y+15 vBackupModData gBackupModData Checked, Backup ModData
+Gui, Add, Checkbox, x20 vBackupPlaylists gBackupPlaylists Checked, Backup Playlists
+Gui, Add, Checkbox, x20 vBackupSongs gBackupSongs Checked, Backup Songs
+
+Gui, Add, Checkbox, x10 vBackupBMBFData gBackupBMBFData, Backup BMBFData
+Gui, Add, Checkbox, vBackupAndroid gBackupAndroid, Backup Android
+
+Gui, Add, Checkbox, y+15 vUpdatePlaylists Checked, update Playlists
 Gui, Add, Checkbox, vSeperateSongs Checked, seperate Songs
 Gui, Add, Checkbox, vCreateUnsorted Checked, create Unsorted Playlist
 Gui, Add, Checkbox, vRecombineSongs Checked, recombine Songs
-Gui, Add, Checkbox, vMoveToQuest Checked, move files back to Quest
-Gui, Add, Button, Default gButtonFunction w200 h40, Press me
-Gui, +Resize +MinSize280x228y
+
+Gui, Add, Checkbox, y+15 vMovePlaylistsToQuest Checked, move Playlists back to Quest
+Gui, Add, Checkbox, vMoveSongsToQuest Checked, move Songs back to Quest
+
+Gui, Add, Button, Default gButtonFunction w200 h40, Execute Everything
+Gui, Add, Button, x+10 y5 vUpdatePlaylistsButton gUpdatePlaylistsButton w50 h50, only Update Playlists
+Gui, +Resize -MaximizeBox +LastFound +MinSize
 Gui, Show, , QuestSaber Backup
+WinGetPos, X, Y, Width, Height
+
+; Set the state of the checkboxes
+for name, value in stateObject
+    GuiControl, , %name%, %value%
+
+Height := Height - 50
+GuiControl, Move, UpdatePlaylistsButton, H%Height%
+
+return
+
+ChooseLocation:
+	Gui, Submit, NoHide
+	if (BackupPlaylists=0 and BackupSongs=0 and BackupAndroid=0 and BackupBMBFData=0)
+		GuiControl, , ChooseLocation, 1
+return
+
+BackupModData:
+	Gui, Submit, NoHide
+	if (BackupModData) {
+		GuiControl, , BackupPlaylists, 1
+		GuiControl, , BackupSongs, 1
+	} else {
+		GuiControl, , BackupPlaylists, 0
+		GuiControl, , BackupSongs, 0
+	}
+	Gui, Submit, NoHide
+	if (BackupPlaylists=0 and BackupSongs=0 and BackupAndroid=0 and BackupBMBFData=0)
+		GuiControl, , ChooseLocation, 1
+return
+
+BackupPlaylists:
+BackupSongs:
+	Gui, Submit, NoHide
+	if (BackupPlaylists and BackupSongs) {
+		GuiControl, , BackupModData, 1
+	} else {
+		GuiControl, , BackupModData, 0
+	}
+BackupAndroid:
+BackupBMBFData:
+	Gui, Submit, NoHide
+	if (BackupPlaylists=0 and BackupSongs=0 and BackupAndroid=0 and BackupBMBFData=0)
+		GuiControl, , ChooseLocation, 1
+return
+
+UpdatePlaylistsButton:
+	GuiControl, Move, UpdatePlaylistsButton, % "H" . Height
 return
 
 ButtonFunction:
+saveState()
 Gui, Submit
 
 FormatTime, timeNow, %A_Now%, dd.MM.yyyy_HH.mm
 backupDir := A_ScriptDir . "\Backup_" . timeNow
 
-if (ChooseLocation = 1) {
+if (ChooseLocation) {
 	FileSelectFolder, backupDir, *%A_ScriptDir%, , Choose a location for/of the Backup
 	if (ErrorLevel != 0) {
 		ExitApp
 	}
 }
 
-if (BackupModData = 1 or BackupBMBFData = 1 or BackupAndroid = 1) {
+if (BackupModData or BackupBMBFData or BackupAndroid) {
 	ADBcheck()
 	ADBdeviceConnected()
 	if (ChooseLocation = 0)
 		FileCreateDir, %backupDir%
 }
 
-if (BackupModData = 1){
+if (BackupModData){
 	RunWait, adb\adb.exe pull "sdcard/ModData" "%backupDir%", , UseErrorLevel Hide
-	if (ErrorLevel != 0) 
+	if (ErrorLevel) 
 	{
 		errorFolders := searchNewestDir(backupDir)
 		for index, errorFolder in errorFolders
@@ -128,11 +197,11 @@ if (BackupModData = 1){
 	}
 }
 
-if (BackupBMBFData = 1){
+if (BackupBMBFData){
 	RunWait, adb\adb.exe pull "sdcard/BMBFData" "%backupDir%", , Hide
 }
 
-if (BackupAndroid = 1){
+if (BackupAndroid){
 	FileCreateDir, %backupDir%\Android\data
 	RunWait, adb\adb.exe pull "sdcard/Android/data/com.beatgames.beatsaber" "%backupDir%\Android\data", , Hide
 
@@ -140,31 +209,45 @@ if (BackupAndroid = 1){
 	RunWait, adb\adb.exe pull "sdcard/Android/obb/com.beatgames.beatsaber" "%backupDir%\Android\obb", , Hide
 }
 
-if (UpdatePlaylists = 1){
-	updatePlaylists(backupDir)
+if (UpdatePlaylists){
+	updatePlaylists("teset", backupDir)
 }
 
-if (SeperateSongs = 1){
+if (SeperateSongs){
 	seperateSongsInPlaylistFolders(backupDir)
 }
 
-if (CreateUnsorted = 1){
+if (CreateUnsorted){
 	;packUnsortedSongsIntoFolder(backupDir)
 	createPlaylistString(backupDir)
 }
 
-if (RecombineSongs = 1){
+if (RecombineSongs){
 	recombineSongs(backupDir)
 }
 
-if (MoveToQuest = 1){
+if (MovePlaylistsToQuest or MoveSongsToQuest){
 	ADBcheck()
 	ADBdeviceConnected()
-	RunWait, % "cmd /c " . "adb\adb.exe shell rm -r ""/sdcard/ModData/com.beatgames.beatsaber/Mods/SongLoader/CustomLevels""", , Hide
-	RunWait, % "cmd /c " . "adb\adb.exe shell rm -r ""/sdcard/ModData/com.beatgames.beatsaber/Mods/PlaylistManager/Playlists""", , Hide
-	RunWait, % "cmd /c " . "adb\adb.exe push """ . backupDir . "\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\Combined"" " . """/sdcard/ModData/com.beatgames.beatsaber/Mods/SongLoader/CustomLevels""", , ;Hide
-	RunWait, % "cmd /c " . "adb\adb.exe push """ . backupDir . "\ModData\com.beatgames.beatsaber\Mods\PlaylistManager\Playlists"" " . """/sdcard/ModData/com.beatgames.beatsaber/Mods/PlaylistManager/Playlists""", , Hide
+	if (MovePlaylistsToQuest){
+		RunWait, % "cmd /c " . "adb\adb.exe shell rm -r ""/sdcard/ModData/com.beatgames.beatsaber/Mods/PlaylistManager/Playlists""", , Hide
+		RunWait, % "cmd /c " . "adb\adb.exe push """ . backupDir . "\ModData\com.beatgames.beatsaber\Mods\PlaylistManager\Playlists"" " . """/sdcard/ModData/com.beatgames.beatsaber/Mods/PlaylistManager/Playlists""", , Hide
+	}
+	if (MoveSongsToQuest){
+		RunWait, % "cmd /c " . "adb\adb.exe shell rm -r ""/sdcard/ModData/com.beatgames.beatsaber/Mods/SongLoader/CustomLevels""", , Hide
+		RunWait, % "cmd /c " . "adb\adb.exe push """ . backupDir . "\ModData\com.beatgames.beatsaber\Mods\SongLoader\CustomLevels\Combined"" " . """/sdcard/ModData/com.beatgames.beatsaber/Mods/SongLoader/CustomLevels""", , ;Hide
+	}
 }
 
 GuiClose:
+Gui, Hide
+saveState()
 ExitApp
+
+saveState(){
+	global
+	Gui, Submit, NoHide
+	; Write the state of the checkboxes to the INI file
+	for name, value in stateObject
+		IniWrite, % %name%, State.ini, States, %name%
+}
